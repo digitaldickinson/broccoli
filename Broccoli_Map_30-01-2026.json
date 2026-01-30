@@ -1,0 +1,401 @@
+{
+  "nodes": [
+    {
+      "id": "center",
+      "label": "MPJ Brainstorm",
+      "description": "Brainstorm your project details here.",
+      "x": 119.3709497564148,
+      "y": 208.01659169029818,
+      "color": "bg-slate-900 text-white font-semibold",
+      "isCenter": true
+    },
+    {
+      "id": "initial-section",
+      "label": "Story Ideas",
+      "description": "",
+      "link": "",
+      "takeaway": "",
+      "lessonLearned": "The sex pistols story was good but I couldn't see how it would fit into a short piece. The tram offered more pictures even if it wasn't my ideal story.  It shows sometimes you go with what has the pictures.",
+      "type": "SECTION",
+      "x": 573,
+      "y": 93,
+      "parentId": "center"
+    },
+    {
+      "id": "node-1769767903470",
+      "label": "Heaton Park Tramway gets back on track",
+      "description": "Heaton Park tramway is set to operate again thanks to a major new funding award securing its future for generations to come.\n\nFor more than 12 months the trams have been unable to run as the electrical substation which powers the Heritage Tramway at Heaton Park needed an overhaul to bring it up to current safety standards. ",
+      "link": "https://www.manchester.gov.uk/news/article/9864/heaton_park_tramway_gets_back_on_track",
+      "takeaway": "",
+      "lessonLearned": "",
+      "contactRole": "",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "",
+      "harvardRef": "",
+      "type": "TEXT",
+      "x": 656.7869762706371,
+      "y": 331,
+      "parentId": "initial-section"
+    },
+    {
+      "id": "node-1769767938583",
+      "label": "Tramway website",
+      "description": "",
+      "link": "https://hptramway.co.uk/",
+      "takeaway": "",
+      "lessonLearned": "",
+      "contactRole": "",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "",
+      "harvardRef": "",
+      "type": "SOURCE",
+      "x": 436.8166966441653,
+      "y": 577,
+      "parentId": "node-1769767903470"
+    },
+    {
+      "id": "node-1769768000412",
+      "label": "BBC Coverage",
+      "description": "",
+      "link": "https://www.bbc.co.uk/news/articles/cn40pkdx4vgo",
+      "takeaway": "",
+      "lessonLearned": "",
+      "contactRole": "",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "",
+      "harvardRef": "",
+      "type": "INDUSTRY",
+      "x": 806.1479701002963,
+      "y": 531,
+      "parentId": "node-1769767903470"
+    },
+    {
+      "id": "node-1769768016411",
+      "label": "ITV coverage",
+      "description": "",
+      "link": "https://www.itv.com/news/granada/2026-01-29/historic-tramway-back-on-track-after-securing-major-funding",
+      "takeaway": "",
+      "lessonLearned": "",
+      "contactRole": "",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "",
+      "harvardRef": "",
+      "type": "INDUSTRY",
+      "x": 901.2257858207274,
+      "y": 429,
+      "parentId": "node-1769767903470"
+    },
+    {
+      "id": "node-1769768054848",
+      "label": "British trams online",
+      "description": "British trams online - who knew. More detail here",
+      "link": "http://www.britishtramsonline.co.uk/news/?p=61697",
+      "takeaway": "",
+      "lessonLearned": "",
+      "contactRole": "",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "",
+      "harvardRef": "",
+      "type": "SOURCE",
+      "x": 344.9017760042815,
+      "y": 440,
+      "parentId": "node-1769767903470"
+    },
+    {
+      "id": "node-1769768161296",
+      "label": "Keith Whitmore",
+      "description": "Mentioned a few times and very connected with trams.",
+      "link": "",
+      "takeaway": "",
+      "lessonLearned": "",
+      "contactRole": "Greater Manchester Transport Heritage Partnership",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "https://www.linkedin.com/in/keith-whitmore-89a41559/?originalSubdomain=uk",
+      "harvardRef": "",
+      "type": "CONTACT",
+      "x": 633.2241736365762,
+      "y": 575,
+      "parentId": "node-1769767903470"
+    },
+    {
+      "id": "node-1769768251247",
+      "label": "Sex pistols played manchester in 1976",
+      "description": "Considered the most important gig in history.",
+      "link": "https://en.wikipedia.org/wiki/Sex_Pistols_at_the_Lesser_Free_Trade_Hall",
+      "takeaway": "",
+      "lessonLearned": "",
+      "contactRole": "",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "",
+      "harvardRef": "",
+      "type": "TEXT",
+      "x": 898.0242299707226,
+      "y": -95.48728416378518,
+      "parentId": "initial-section"
+    },
+    {
+      "id": "node-1769768363969",
+      "label": "David Nolan",
+      "description": "Wrote the book \"I Swear I Was There - Sex Pistols, Manchester and the Gig that Changed the World\"",
+      "link": "",
+      "takeaway": "",
+      "lessonLearned": "",
+      "contactRole": "Author",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "https://www.instagram.com/nolanwriter/?hl=en",
+      "harvardRef": "",
+      "type": "CONTACT",
+      "x": 1117.5073833153322,
+      "y": 43.90776293475894,
+      "parentId": "node-1769768251247"
+    },
+    {
+      "id": "node-1769768415594",
+      "label": "BBC coverage with pictures",
+      "description": "",
+      "link": "https://www.bbc.co.uk/programmes/articles/4f0B5rf6z2wYQpm5WNqsqP7/they-swear-they-were-there-sex-pistols-at-the-lesser-free-trade-hall",
+      "takeaway": "",
+      "lessonLearned": "",
+      "contactRole": "",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "",
+      "harvardRef": "",
+      "type": "SOURCE",
+      "x": 914.821003515801,
+      "y": 91.19544739763427,
+      "parentId": "node-1769768251247"
+    },
+    {
+      "id": "node-1769768431822",
+      "label": "Challenges",
+      "description": "",
+      "link": "",
+      "takeaway": "",
+      "lessonLearned": "I needed to change the script not be hostage to it.",
+      "contactRole": "",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "",
+      "harvardRef": "",
+      "type": "SECTION",
+      "x": 15.731602966362118,
+      "y": -79.64284148371232,
+      "parentId": "center"
+    },
+    {
+      "id": "node-1769768461142",
+      "label": "Scripting",
+      "description": "I had some challenges with script in my last assessment.",
+      "link": "",
+      "takeaway": "",
+      "lessonLearned": "",
+      "contactRole": "",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "",
+      "harvardRef": "",
+      "type": "TEXT",
+      "x": 357.0979599278304,
+      "y": -161.34967038726094,
+      "parentId": "node-1769768431822"
+    },
+    {
+      "id": "node-1769768518567",
+      "label": "Writing for Broadcast Journalists.",
+      "description": "",
+      "link": "",
+      "takeaway": "\"You have to write as you would speak to someone, but you also have to pare it down. Less is more. Take out the superfluous words. Take out the unnecessary adjectives. At the same time keep it conversational to engage people. It’s very different from the written text.\"",
+      "lessonLearned": "",
+      "contactRole": "",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "",
+      "harvardRef": "Thompson, R. (2010) Writing for Broadcast Journalists. 2nd ed. Hoboken: Taylor & Francis. Available at: https://public.ebookcentral.proquest.com/choice/publicfullrecord.aspx?p=557324 (Accessed: January 30, 2026).",
+      "type": "READING",
+      "x": 321.98196798284073,
+      "y": -51.34967038726094,
+      "parentId": "node-1769768461142"
+    },
+    {
+      "id": "node-1769768652008",
+      "label": "Reflection stuff",
+      "description": "",
+      "link": "",
+      "takeaway": "",
+      "lessonLearned": "I need to think about reflection from the start",
+      "contactRole": "",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "",
+      "harvardRef": "",
+      "type": "SECTION",
+      "x": -13.101121011857742,
+      "y": 340.8341365780709,
+      "parentId": "center"
+    },
+    {
+      "id": "node-1769768663104",
+      "label": "Reflective Practices for Future Journalism",
+      "description": "",
+      "link": "",
+      "takeaway": "Reflection only makes sense if it starts from the sense of immediacy and autonomy within journalistic practice, recognises the constraints that journalists face and acknowledges the aversion among journalists against standardised protocols in their craft",
+      "lessonLearned": "",
+      "contactRole": "",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "",
+      "harvardRef": "Ramaker, T., van der Stoep, J. and Deuze, M. (2015) ‘Reflective Practices for Future Journalism: The Need, the Resistance and the Way Forward’, Javnost - The Public, 22(4), pp. 345–361. doi: 10.1080/13183222.2015.1091622.",
+      "type": "READING",
+      "x": -27.202481838566882,
+      "y": 450.8341365780709,
+      "parentId": "node-1769768652008"
+    },
+    {
+      "id": "node-1769772335164",
+      "label": "Submission stuff",
+      "description": "",
+      "link": "",
+      "takeaway": "",
+      "lessonLearned": "I lost marks last time for not having the right forms. I need to get that right next time",
+      "contactRole": "",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "",
+      "harvardRef": "",
+      "type": "SECTION",
+      "x": -380.9545952969847,
+      "y": 33.89301868021448,
+      "parentId": "center"
+    },
+    {
+      "id": "node-1769772363229",
+      "label": "Submission check list",
+      "description": "",
+      "link": "",
+      "takeaway": "",
+      "lessonLearned": "",
+      "contactRole": "",
+      "contactEmail": "",
+      "contactPhone": "",
+      "contactWeb": "",
+      "harvardRef": "",
+      "tasks": [
+        {
+          "id": 1769772374942,
+          "text": "Check contact details",
+          "completed": false
+        },
+        {
+          "id": 1769772384068,
+          "text": "Check references",
+          "completed": false
+        },
+        {
+          "id": 1769772387667,
+          "text": "Wordcount",
+          "completed": true
+        },
+        {
+          "id": 1769772395386,
+          "text": "Time +/- 3 seconds",
+          "completed": false
+        },
+        {
+          "id": 1769772409718,
+          "text": "Formatted script",
+          "completed": true
+        }
+      ],
+      "type": "TASK",
+      "x": -456.3702496878556,
+      "y": 200.84042736942524,
+      "parentId": "node-1769772335164"
+    }
+  ],
+  "connections": [
+    {
+      "from": "center",
+      "to": "initial-section"
+    },
+    {
+      "from": "initial-section",
+      "to": "node-1769767903470"
+    },
+    {
+      "from": "node-1769767903470",
+      "to": "node-1769767938583"
+    },
+    {
+      "from": "node-1769767903470",
+      "to": "node-1769768000412"
+    },
+    {
+      "from": "node-1769767903470",
+      "to": "node-1769768016411"
+    },
+    {
+      "from": "node-1769767903470",
+      "to": "node-1769768054848"
+    },
+    {
+      "from": "node-1769767903470",
+      "to": "node-1769768161296"
+    },
+    {
+      "from": "initial-section",
+      "to": "node-1769768251247"
+    },
+    {
+      "from": "node-1769768251247",
+      "to": "node-1769768363969"
+    },
+    {
+      "from": "node-1769768251247",
+      "to": "node-1769768415594"
+    },
+    {
+      "from": "center",
+      "to": "node-1769768431822"
+    },
+    {
+      "from": "node-1769768431822",
+      "to": "node-1769768461142"
+    },
+    {
+      "from": "node-1769768461142",
+      "to": "node-1769768518567"
+    },
+    {
+      "from": "center",
+      "to": "node-1769768652008"
+    },
+    {
+      "from": "node-1769768652008",
+      "to": "node-1769768663104"
+    },
+    {
+      "from": "center",
+      "to": "node-1769772335164"
+    },
+    {
+      "from": "node-1769772335164",
+      "to": "node-1769772363229"
+    }
+  ],
+  "view": {
+    "x": 352,
+    "y": 300,
+    "zoom": 0.4829138371348369
+  },
+  "version": "1.3",
+  "timestamp": "2026-01-30T12:27:41.823Z"
+}
