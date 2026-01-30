@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Broccoli - Journalism Mindmapper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        body { margin: 0; padding: 0; overflow: hidden; }
+        .canvas-bg {
+            background-color: #fefeff;
+            background-image: radial-gradient(#f1f5f9 1px, transparent 1px);
+            background-size: 24px 24px;
+        }
+        .node-transition { transition: transform 0.1s ease-out; }
+        .lucide { display: inline-block; vertical-align: middle; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+        .node-delete-btn { opacity: 0; transition: opacity 0.2s; }
+        .node-container:hover .node-delete-btn { opacity: 1; }
+        .node-container:focus-visible { outline: 2px solid #e11d48; outline-offset: 4px; }
+        .no-select { user-select: none; }
+        .sidebar-transition { transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+        @keyframes pulse-ring {
+            0% { transform: translate(-50%, -50%) scale(0.95); box-shadow: 0 0 0 0 rgba(225, 29, 72, 0.7); }
+            70% { transform: translate(-50%, -50%) scale(1); box-shadow: 0 0 0 15px rgba(225, 29, 72, 0); }
+            100% { transform: translate(-50%, -50%) scale(0.95); box-shadow: 0 0 0 0 rgba(225, 29, 72, 0); }
+        }
+        .relinking-node { animation: pulse-ring 2s infinite; border-color: #e11d48 !important; border-width: 3px !important; z-index: 50 !important; }
+        .line-hit-area { stroke: transparent; stroke-width: 20; pointer-events: auto; }
+        .line-hit-area-active { cursor: pointer; }
+        .line-hit-area-active:hover + .connection-line { stroke: #e11d48; stroke-width: 4; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect, useCallback, useMemo } = React;
+
+        const NODE_TYPES = {
+            SECTION: { label: 'Section Heading', icon: 'Folder', color: 'bg-indigo-50 border-indigo-200 text-indigo-900', isRoot: true },
+            TEXT: { label: 'Free Text', icon: 'Type', color: 'bg-white border-slate-200 text-slate-700' },
+            SOURCE: { label: 'Source', icon: 'Search', color: 'bg-amber-50 border-amber-200 text-amber-900' },
+            READING: { label: 'Reading/Research', icon: 'BookOpen', color: 'bg-slate-50 border-slate-300 text-slate-700' },
+            INDUSTRY: { label: 'Industry Example', icon: 'ExternalLink', color: 'bg-indigo-50 border-indigo-200 text-indigo-900' },
+            CONTACT: { label: 'Contact', icon: 'User', color: 'bg-emerald-50 border-emerald-200 text-emerald-900' },
+            TASK: { label: 'Task', icon: 'CheckSquare', color: 'bg-rose-50 border-rose-200 text-rose-900' },
+        };
+
+        const STORAGE_KEY = 'broccoli_autosave_data';
+        const toKebab = (str) => str.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+
+        const DEFAULT_STATE = {
+            nodes: [
+                { id: 'center', label: 'Mindmap title', description: 'Brainstorm your project and story details here.', x: 400, y: 320, color: 'bg-slate-900 text-white font-semibold', isCenter: true },
+                { id: 'initial-section', label: 'section name', description: '', link: '', takeaway: '', lessonLearned: '', type: 'SECTION', x: 400, y: 150, parentId: 'center' }
+            ],
+            connections: [{ from: 'center', to: 'initial-section' }],
+            view: { x: 0, y: 0, zoom: 1 }
+        };
+
+        const BroccoliIcon = ({ size = 20, className = "" }) => (
+            <svg width={size} height={size} viewBox="0 0 1024 1024" fill="currentColor" xmlns="http://www.w3.org/2000/svg" className={className} aria-hidden="true" focusable="false">
+                <path d="M761.5 365.3c-14.1-64.1-86.8-126.1-152.6-109.8-21.2-34.7-59-56.1-100.4-56.2-47.1-0.1-77.2 29.5-93.9 69.3-37.3-14.6-86.9-15.2-119.7 5.1-36.1 22.3-56 62.3-42.7 100.9-57.2 28.3-81.7 96.3-51 156.3 32.8 64 94.9 66.9 153.8 43.8 7.5 10.2 17 18.9 27.7 25.7 30 50.1 49.1 122.9 41.9 180.7-0.8 6.2 6 11.6 11.6 11.6 40.5 0 80.9 0 121.4 0.1 5 0 9.9-3.6 11.2-8.5 16.6-63.8 42.3-123.8 88.3-171.5 12.8-5.6 24.2-13.8 32.7-24.7 60.2 38.5 136.6 20.2 158.1-56.2 20.1-72.2-12.4-146.5-86.4-166.6zM548.7 769.6c-33.4 0-66.8 0-100.2-0.1 3.5-50.5-9.8-107.7-32.1-154.8 12.7 3.2 25.9 4.3 38.6 3.2 8.4 32.9 11.8 66.2 9.8 100.3-0.9 14.9 22.3 14.9 23.2 0 2.1-35.6-1.6-70.6-10.3-105 16.7-5.6 31.4-15.7 41.9-31.1 5.8 6.1 11.5 11.6 17.5 16.3-13 34.3-14.2 69.2-12 106 0.9 14.8 24.1 14.9 23.2 0-2-31.8-2.2-63.8 8.7-93.9 13.3 6.2 28.6 10 48.2 11.2 4.4 0.3 8.8 0.3 13.3 0-33.5 43.5-55.1 94.3-69.8 147.9z m147.4-214.7c-2.2-1.8-4.5-2.8-6.8-3.4-6.4-2.8-13.9-1.8-17.5 6.5-14.8 33.7-55.9 36.6-87.2 29.6-29.6-6.7-40.1-22.5-57.5-43.7-7.8-9.5-22.7-3.3-25.8 6.8-17.2 54.8-97.5 43.5-123.1 3.8-0.4-0.6-0.9-0.9-1.4-1.4-2.4-8.7-12.2-16.3-22.9-11.3-41.8 19.5-90.5 29-119.8-15.6-31.7-48.2-12.4-110.7 42.9-128.7 9.3-3 14.6-13.8 9.2-22.7-24-39.9 16.8-82.4 57-85.3 22.3-1.6 52.9 2.5 72.3 13.6 8.9 5.1 19.8 0.3 22.7-9.2 12.3-39.8 37.6-69.3 83.4-62.4 30.5 4.7 53.4 22.5 66.5 50.1 3.7 7.7 10.6 9 16.8 6.8 1.4-0.2 2.8-0.3 4.3-1 49.2-22.2 118.2 42.1 123.4 89.3 0.4 3.7 2.1 6.6 4.2 8.9 1.6 3.6 4.7 6.6 9.8 7.7 47.3 10.3 80.5 50.5 77.1 99.7-5 71.2-67.5 113.2-127.6 61.9z" />
+                <path d="M401.4 315c-49-8.2-92.6 26.1-92.7 76.7 0 19.9 30.9 19.9 30.9 0 0-28.9 24.2-51.8 53.5-46.8 19.5 3.2 27.9-26.6 8.3-29.9zM506.2 262.8c-24.7 1.6-43.5 16-51.3 40.3-4.6 14.2 17.8 20.3 22.4 6.2 6.5-20.1 24-24 42.5-23.8 19.3 0.2 29.9 8.1 42.1 22.6 9.6 11.4 26-5.1 16.4-16.4-20.8-24.7-40.5-31-72.1-28.9z" />
+            </svg>
+        );
+
+        function App() {
+            const getInitialData = () => {
+                const saved = localStorage.getItem(STORAGE_KEY);
+                if (saved) {
+                    try {
+                        const parsed = JSON.parse(saved);
+                        if (parsed.nodes && parsed.connections) return parsed;
+                    } catch (e) { console.error("Failed to load autosave", e); }
+                }
+                return DEFAULT_STATE;
+            };
+
+            const initialData = getInitialData();
+            const [nodes, setNodes] = useState(initialData.nodes);
+            const [connections, setConnections] = useState(initialData.connections);
+            const [view, setView] = useState(initialData.view);
+            const [isListView, setIsListView] = useState(false);
+
+            const [history, setHistory] = useState([{ 
+                nodes: JSON.parse(JSON.stringify(initialData.nodes)), 
+                connections: JSON.parse(JSON.stringify(initialData.connections)) 
+            }]);
+            const [historyIndex, setHistoryIndex] = useState(0);
+
+            const [isPanning, setIsPanning] = useState(false);
+            const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
+            const [draggingId, setDraggingId] = useState(null);
+            const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+            const [selectedId, setSelectedId] = useState(null);
+            const [showHelp, setShowHelp] = useState(true);
+            const [plusMenuId, setPlusMenuId] = useState(null);
+            const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
+            const [relinkingNodeId, setRelinkingNodeId] = useState(null);
+            const [newTaskInput, setNewTaskInput] = useState('');
+            const fileInputRef = useRef(null);
+
+            useEffect(() => {
+                const dataToSave = { nodes, connections, view };
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToSave));
+            }, [nodes, connections, view]);
+
+            const selectedNode = useMemo(() => nodes.find(n => n.id === selectedId), [nodes, selectedId]);
+            const sectionNodes = useMemo(() => nodes.filter(n => n.type === 'SECTION'), [nodes]);
+            const missingLessons = useMemo(() => sectionNodes.filter(n => !n.lessonLearned || n.lessonLearned.trim() === ""), [sectionNodes]);
+            const isExportDisabled = sectionNodes.length === 0 || missingLessons.length > 0;
+
+            const Icon = ({ name, size = 16, className = "" }) => {
+                const iconRef = useRef(null);
+                useEffect(() => {
+                    if (iconRef.current && window.lucide) {
+                        const kebabName = toKebab(name);
+                        iconRef.current.innerHTML = `<i data-lucide="${kebabName}"></i>`;
+                        window.lucide.createIcons({ attrs: { width: size, height: size, class: className }, nameAttr: 'data-lucide' });
+                    }
+                }, [name, size, className]);
+                return <span ref={iconRef} className="inline-flex items-center justify-center leading-none pointer-events-none"></span>;
+            };
+
+            const pushToHistory = useCallback((currentNodes, currentConnections) => {
+                const snapshotNodes = JSON.parse(JSON.stringify(currentNodes));
+                const snapshotConnections = JSON.parse(JSON.stringify(currentConnections));
+                setHistory(prev => {
+                    const newHistory = prev.slice(0, historyIndex + 1);
+                    if (newHistory.length >= 20) newHistory.shift();
+                    const result = [...newHistory, { nodes: snapshotNodes, connections: snapshotConnections }];
+                    setHistoryIndex(result.length - 1);
+                    return result;
+                });
+            }, [historyIndex]);
+
+            const undo = useCallback(() => {
+                if (historyIndex > 0) {
+                    const prevState = history[historyIndex - 1];
+                    setNodes(JSON.parse(JSON.stringify(prevState.nodes)));
+                    setConnections(JSON.parse(JSON.stringify(prevState.connections)));
+                    setHistoryIndex(historyIndex - 1);
+                }
+            }, [history, historyIndex]);
+
+            const redo = useCallback(() => {
+                if (historyIndex < history.length - 1) {
+                    const nextState = history[historyIndex + 1];
+                    setNodes(JSON.parse(JSON.stringify(nextState.nodes)));
+                    setConnections(JSON.parse(JSON.stringify(nextState.connections)));
+                    setHistoryIndex(historyIndex + 1);
+                }
+            }, [history, historyIndex]);
+
+            const resetView = useCallback(() => setView({ x: 0, y: 0, zoom: 1 }), []);
+            const updateField = (f, v) => setNodes(nodes.map(n => n.id === selectedId ? { ...n, [f]: v } : n));
+
+            const handleNewMap = () => {
+                if (confirm("Are you sure you want to start a new map? This will clear all current work.")) {
+                    setNodes(DEFAULT_STATE.nodes);
+                    setConnections(DEFAULT_STATE.connections);
+                    setView(DEFAULT_STATE.view);
+                    setSelectedId(null);
+                    setHistory([{ nodes: DEFAULT_STATE.nodes, connections: DEFAULT_STATE.connections }]);
+                    setHistoryIndex(0);
+                }
+            };
+
+            const zoomIn = useCallback(() => setView(v => ({ ...v, zoom: Math.min(v.zoom + 0.1, 3) })), []);
+            const zoomOut = useCallback(() => setView(v => ({ ...v, zoom: Math.max(v.zoom - 0.1, 0.2) })), []);
+
+            const addNode = useCallback((parentId, typeKey) => {
+                const id = 'node-' + Date.now();
+                const parent = nodes.find(n => n.id === parentId);
+                if (!parent) return;
+
+                const newNode = {
+                    id, 
+                    label: typeKey === 'SECTION' ? 'section name' : (typeKey === 'CONTACT' ? 'New Contact' : (typeKey === 'TASK' ? 'New Task List' : (typeKey === 'SOURCE' ? 'New Source' : `New ${NODE_TYPES[typeKey].label}`))),
+                    description: '', link: '', takeaway: '', lessonLearned: '',
+                    contactRole: '', contactEmail: '', contactPhone: '', contactWeb: '', harvardRef: '',
+                    tasks: typeKey === 'TASK' ? [] : undefined,
+                    type: typeKey, x: parent.x + (Math.random() * 80 - 40), y: parent.y + 110, parentId
+                };
+                
+                const nextNodes = [...nodes, newNode];
+                const nextConnections = [...connections, { from: parentId, to: id }];
+                setNodes(nextNodes);
+                setConnections(nextConnections);
+                pushToHistory(nextNodes, nextConnections);
+                setSelectedId(id);
+                setPlusMenuId(null);
+                setIsSidebarOpen(true);
+            }, [nodes, connections, pushToHistory]);
+
+            const deleteNode = useCallback((id, e) => {
+                if (e) { e.stopPropagation(); e.preventDefault(); }
+                const nodeToDelete = nodes.find(n => n.id === id);
+                if (!nodeToDelete || nodeToDelete.isCenter) return;
+                
+                const getChildrenIds = (pid, nodeList) => {
+                    const children = nodeList.filter(n => n.parentId === pid);
+                    return children.reduce((acc, child) => [...acc, child.id, ...getChildrenIds(child.id, nodeList)], []);
+                };
+                
+                const toDeleteIds = [id, ...getChildrenIds(id, nodes)];
+                const nextConnections = connections.filter(c => !toDeleteIds.includes(c.to) && !toDeleteIds.includes(c.from));
+                const nextNodes = nodes.filter(n => !toDeleteIds.includes(n.id));
+                
+                setConnections(nextConnections);
+                pushToHistory(nextNodes, nextConnections);
+                setNodes(nextNodes);
+                if (selectedId && toDeleteIds.includes(selectedId)) setSelectedId(null);
+            }, [nodes, connections, pushToHistory, selectedId]);
+
+            const moveNodeToParent = (childId, newParentId) => {
+                if (childId === newParentId) { setRelinkingNodeId(null); return; }
+                const isDescendant = (parent, potentialChildId) => {
+                    const children = nodes.filter(n => n.parentId === parent);
+                    if (children.some(c => c.id === potentialChildId)) return true;
+                    return children.some(c => isDescendant(c.id, potentialChildId));
+                };
+                if (isDescendant(childId, newParentId)) { setRelinkingNodeId(null); return; }
+                const nextNodes = nodes.map(node => node.id === childId ? { ...node, parentId: newParentId } : node);
+                const nextConnections = connections.map(conn => conn.to === childId ? { ...conn, from: newParentId } : conn);
+                setNodes(nextNodes); setConnections(nextConnections); pushToHistory(nextNodes, nextConnections);
+                setRelinkingNodeId(null); setSelectedId(childId); setIsSidebarOpen(true);
+            };
+
+            const handleWheel = (e) => {
+                const zoomSpeed = 0.001;
+                const newZoom = Math.min(Math.max(view.zoom + (-e.deltaY) * zoomSpeed, 0.2), 3);
+                setView(prev => ({ ...prev, zoom: newZoom }));
+            };
+
+            const handleMouseDownBg = (e) => {
+                const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+                const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+                if (relinkingNodeId) { setRelinkingNodeId(null); return; }
+                setIsPanning(true); setLastMousePos({ x: clientX, y: clientY }); setPlusMenuId(null);
+            };
+
+            const handleStartNodeDrag = (e, id) => {
+                e.stopPropagation();
+                if (relinkingNodeId) { moveNodeToParent(relinkingNodeId, id); return; }
+                const node = nodes.find(n => n.id === id);
+                const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+                const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+                setDraggingId(id);
+                setDragOffset({ x: ((clientX - view.x) / view.zoom) - node.x, y: ((clientY - view.y) / view.zoom) - node.y });
+                setSelectedId(id); setPlusMenuId(null); setIsSidebarOpen(true);
+            };
+
+            const handleMove = (e) => {
+                const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+                const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
+                if (draggingId) {
+                    setNodes(prev => prev.map(n => n.id === draggingId ? { ...n, x: ((clientX - view.x) / view.zoom) - dragOffset.x, y: ((clientY - view.y) / view.zoom) - dragOffset.y } : n));
+                } else if (isPanning) {
+                    setView(v => ({ ...v, x: v.x + (clientX - lastMousePos.x), y: v.y + (clientY - lastMousePos.y) }));
+                    setLastMousePos({ x: clientX, y: clientY });
+                }
+            };
+
+            const handleEndInteraction = () => { if (draggingId) pushToHistory(nodes, connections); setDraggingId(null); setIsPanning(false); };
+
+            const addTask = () => {
+                if (!newTaskInput.trim()) return;
+                const updatedTasks = [...(selectedNode.tasks || []), { id: Date.now(), text: newTaskInput, completed: false }];
+                updateField('tasks', updatedTasks); setNewTaskInput('');
+                pushToHistory(nodes.map(n => n.id === selectedId ? { ...n, tasks: updatedTasks } : n), connections);
+            };
+
+            const toggleTask = (taskId) => {
+                const updatedTasks = selectedNode.tasks.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t);
+                updateField('tasks', updatedTasks);
+                pushToHistory(nodes.map(n => n.id === selectedId ? { ...n, tasks: updatedTasks } : n), connections);
+            };
+
+            const removeTask = (taskId) => {
+                const updatedTasks = selectedNode.tasks.filter(t => t.id !== taskId);
+                updateField('tasks', updatedTasks);
+                pushToHistory(nodes.map(n => n.id === selectedId ? { ...n, tasks: updatedTasks } : n), connections);
+            };
+
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'INPUT') return;
+                    const key = e.key.toLowerCase();
+                    if ((e.ctrlKey || e.metaKey) && key === 'z') { if (e.shiftKey) redo(); else undo(); e.preventDefault(); return; }
+                    if ((e.ctrlKey || e.metaKey) && key === 'y') { redo(); e.preventDefault(); return; }
+                    if (key === 'escape') setRelinkingNodeId(null);
+                    if (key === 'h') { addNode('center', 'SECTION'); e.preventDefault(); return; }
+                    if (key === 's' && selectedId) { addNode(selectedId, 'SOURCE'); e.preventDefault(); return; }
+                    if (key === 'c' && selectedId) { addNode(selectedId, 'CONTACT'); e.preventDefault(); return; }
+                    if (key === 'd' && selectedId) { addNode(selectedId, 'TASK'); e.preventDefault(); return; }
+                    if (selectedId && !isPanning && !draggingId) {
+                        const step = e.shiftKey ? 20 : 5;
+                        if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown'].includes(key)) {
+                            setNodes(prev => prev.map(n => n.id === selectedId ? { ...n, x: n.x + (key === 'arrowright' ? step : key === 'arrowleft' ? -step : 0), y: n.y + (key === 'arrowdown' ? step : key === 'arrowup' ? -step : 0) } : n));
+                            e.preventDefault();
+                        }
+                        if (key === 'e') addNode(selectedId, 'INDUSTRY');
+                        else if (key === 'r') addNode(selectedId, 'READING');
+                        else if (key === 't') addNode(selectedId, 'TEXT');
+                        else if (key === 'backspace' || key === 'delete') deleteNode(selectedId);
+                    } else if (key === 'arrowup') {
+                        zoomIn(); e.preventDefault();
+                    } else if (key === 'arrowdown') {
+                        zoomOut(); e.preventDefault();
+                    } else if (key === 'z') resetView();
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [selectedId, isPanning, draggingId, addNode, deleteNode, resetView, undo, redo, zoomIn, zoomOut]);
+
+            const saveProject = () => {
+                const projectData = { nodes, connections, view, version: "1.3", timestamp: new Date().toISOString() };
+                const blob = new Blob([JSON.stringify(projectData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url; link.download = `Broccoli_Map_${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}.json`;
+                document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
+            };
+
+            const handleLoadClick = () => { if (fileInputRef.current) fileInputRef.current.click(); };
+            const loadProject = (e) => {
+                const file = e.target.files[0]; if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (ev) => {
+                    try {
+                        const data = JSON.parse(ev.target.result);
+                        if (data.nodes && data.connections) { 
+                            setNodes(data.nodes); setConnections(data.connections); setView(data.view || {x:0, y:0, zoom:1}); setSelectedId(null); 
+                            setHistory([{ nodes: data.nodes, connections: data.connections }]); setHistoryIndex(0);
+                        }
+                    } catch (err) { alert("Invalid file format"); }
+                };
+                reader.readAsText(file); e.target.value = '';
+            };
+
+            const exportToWord = () => {
+                if (isExportDisabled) return;
+                const sortedSections = nodes.filter(n => n.type === 'SECTION').sort((a, b) => a.x - b.x);
+                let content = `<html><head><meta charset="utf-8"><title>Mindmap output</title><style>body { font-family: 'Aptos', 'Segoe UI', sans-serif; padding: 40pt; } .title { font-size: 28pt; font-weight: bold; border-bottom: 1pt solid #DDD; } h1 { color: #2B579A; font-size: 20pt; margin-top: 30pt; } h2 { color: #2B579A; font-size: 16pt; margin-top: 20pt; } p { font-size: 12pt; margin-bottom: 10pt; } .label { font-weight: bold; color: #666; font-size: 10pt; text-transform: uppercase; } .lesson-box { background: #FFF1F2; padding: 10pt; border-left: 4pt solid #E11D48; margin-bottom: 15pt; } .contact-card { background: #F0FDF4; border: 1pt solid #10B981; padding: 10pt; border-radius: 8pt; margin: 10pt 0; }</style></head><body><div class="title">Mindmap output (via Broccoli)</div>`;
+                const renderHierarchy = (pid, level = 0) => {
+                    return nodes.filter(n => n.parentId === pid).map(child => {
+                        let html = `<div style="margin-left: 15pt"><h${level+2}>${child.label}</h${level+2}>`;
+                        if (child.type === 'CONTACT') {
+                            html += `<div class="contact-card"><p><strong>Name:</strong> ${child.label}</p>${child.contactRole ? `<p><strong>Role:</strong> ${child.contactRole}</p>` : ''}${child.contactEmail ? `<p><strong>Email:</strong> ${child.contactEmail}</p>` : ''}${child.contactPhone ? `<p><strong>Phone:</strong> ${child.contactPhone}</p>` : ''}${child.contactWeb ? `<p><strong>Web:</strong> ${child.contactWeb}</p>` : ''}${child.description ? `<p><strong>Notes:</strong><br>${child.description}</p>` : ''}</div>`;
+                        } else if (child.type === 'TASK') {
+                            html += `<ul style="list-style: none; padding: 0;">${(child.tasks || []).map(t => `<li style="margin-bottom: 4pt;">${t.completed ? '☑' : '☐'} ${t.text}</li>`).join('')}</ul>`;
+                        } else if (child.type === 'READING') {
+                            html += `${child.harvardRef ? `<p><span class="label">HARVARD REFERENCE:</span><br>${child.harvardRef}</p>` : ''}${child.link ? `<p><span class="label">LINK:</span> ${child.link}</p>` : ''}${child.takeaway ? `<p><span class="label">TAKEAWAY:</span><br><i>"${child.takeaway}"</i></p>` : ''}`;
+                        } else {
+                            html += `${child.description ? `<p><span class="label">DESCRIPTION:</span><br>${child.description}</p>` : ''}${child.link ? `<p><span class="label">LINK:</span> ${child.link}</p>` : ''}${child.takeaway ? `<p><span class="label">TAKEAWAY:</span><br><i>"${child.takeaway}"</i></p>` : ''}`;
+                        }
+                        return html + `</div>` + renderHierarchy(child.id, level + 1);
+                    }).join('');
+                };
+                sortedSections.forEach((sec, idx) => { 
+                    content += `<h1>${idx + 1}. ${sec.label}</h1>${sec.description ? `<p>${sec.description}</p>` : ''}<div class="lesson-box"><p><span class="label">LESSON LEARNED:</span><br><strong>${sec.lessonLearned}</strong></p></div>`;
+                    content += renderHierarchy(sec.id); 
+                });
+                const allContacts = nodes.filter(n => n.type === 'CONTACT').sort((a, b) => a.label.localeCompare(b.label));
+                if (allContacts.length > 0) {
+                    content += `<br clear="all" style="page-break-before:always"><h1>Contacts Directory</h1>`;
+                    allContacts.forEach(child => {
+                        content += `<div class="contact-card"><p><strong>Name:</strong> ${child.label}</p>${child.contactRole ? `<p><strong>Role:</strong> ${child.contactRole}</p>` : ''}${child.contactEmail ? `<p><strong>Email:</strong> ${child.contactEmail}</p>` : ''}${child.contactPhone ? `<p><strong>Phone:</strong> ${child.contactPhone}</p>` : ''}${child.contactWeb ? `<p><strong>Web:</strong> ${child.contactWeb}</p>` : ''}${child.description ? `<p><strong>Notes:</strong><br>${child.description}</p>` : ''}</div>`;
+                    });
+                }
+                const allRefs = nodes.filter(n => n.type === 'READING' && n.harvardRef && n.harvardRef.trim()).map(n => n.harvardRef.trim()).sort((a, b) => a.localeCompare(b));
+                if (allRefs.length > 0) {
+                    content += `<br clear="all" style="page-break-before:always"><h1>Reference List</h1>`;
+                    allRefs.forEach(ref => { content += `<p style="margin-bottom: 8pt;">${ref}</p>`; });
+                }
+                content += `</body></html>`;
+                const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = 'Mindmap_Output.doc'; a.click();
+            };
+
+            const renderOutlineNode = (nodeId, level = 0) => {
+                const node = nodes.find(n => n.id === nodeId);
+                if (!node) return null;
+                const children = nodes.filter(n => n.parentId === nodeId);
+                return (
+                    <li key={node.id} className="mb-2">
+                        <button 
+                            onClick={() => { setSelectedId(node.id); setIsSidebarOpen(true); }}
+                            className={`text-left p-2 rounded hover:bg-slate-100 transition-colors w-full ${selectedId === node.id ? 'bg-rose-50 ring-1 ring-rose-200' : ''}`}
+                        >
+                            <span className="font-bold mr-2 text-slate-400">[{node.type || 'ROOT'}]</span>
+                            {node.label}
+                        </button>
+                        {children.length > 0 && (
+                            <ul className="ml-6 mt-2 border-l-2 border-slate-100 pl-4" role="group">
+                                {children.map(child => renderOutlineNode(child.id, level + 1))}
+                            </ul>
+                        )}
+                    </li>
+                );
+            };
+
+            return (
+                <div className="flex h-screen w-full font-sans overflow-hidden bg-slate-50 no-select" onMouseMove={handleMove} onMouseUp={handleEndInteraction} onTouchMove={handleMove} onTouchEnd={handleEndInteraction}>
+                    <input type="file" ref={fileInputRef} onChange={loadProject} accept=".json" className="hidden" />
+                    {isSidebarOpen && <div className="fixed inset-0 bg-slate-900/40 z-30 md:hidden backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setIsSidebarOpen(false)} />}
+                    <aside className={`fixed md:relative z-40 h-full w-4/5 sm:w-80 bg-white border-r flex flex-col shadow-2xl sidebar-transition ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+                        <div className="p-5 bg-slate-50 border-b flex flex-col gap-3">
+                            <div className="flex items-center justify-between">
+                                <h1 className="text-xl font-bold flex items-center gap-2 text-slate-800 leading-none"><BroccoliIcon className="text-emerald-600 w-7 h-7 shrink-0" />Broccoli</h1>
+                                <button onClick={() => setIsSidebarOpen(false)} className="md:hidden p-2 text-slate-400 hover:text-rose-500" aria-label="Close sidebar"><Icon name="X" size={20} /></button>
+                            </div>
+                            <div className="flex items-center gap-1.5 pt-1">
+                                <button onClick={undo} disabled={historyIndex === 0} className={`p-2 border bg-white rounded-lg transition-all ${historyIndex === 0 ? 'opacity-30' : 'hover:bg-slate-50 active:scale-90 shadow-sm'}`} title="Undo"><Icon name="Undo" size={14}/></button>
+                                <button onClick={redo} disabled={historyIndex === history.length - 1} className={`p-2 border bg-white rounded-lg transition-all ${historyIndex === history.length - 1 ? 'opacity-30' : 'hover:bg-slate-50 active:scale-90 shadow-sm'}`} title="Redo"><Icon name="Redo" size={14}/></button>
+                                <div className="w-px h-5 bg-slate-200 mx-1"></div>
+                                <button 
+                                    onClick={() => setIsListView(!isListView)} 
+                                    className={`p-2 border rounded-lg transition-all active:scale-90 shadow-sm ${isListView ? 'bg-indigo-600 text-white border-indigo-700' : 'bg-white hover:bg-slate-50'}`} 
+                                    title={isListView ? "Show Canvas" : "Show List View"}
+                                >
+                                    <Icon name={isListView ? "Grid" : "List"} size={14} />
+                                </button>
+                                <button 
+                                    onClick={handleNewMap} 
+                                    className="p-2 border bg-white rounded-lg hover:bg-slate-50 active:scale-90 shadow-sm transition-all" 
+                                    title="New Map"
+                                >
+                                    <Icon name="Plus" size={14} />
+                                </button>
+                                <div className="w-px h-5 bg-slate-200 mx-1"></div>
+                                <button onClick={saveProject} className="p-2 border bg-white rounded-lg hover:bg-slate-50 active:scale-90 shadow-sm transition-all" title="Save File"><Icon name="Save" size={14}/></button>
+                                <button onClick={handleLoadClick} className="p-2 border bg-white rounded-lg hover:bg-slate-50 active:scale-90 shadow-sm transition-all" title="Load File"><Icon name="FolderOpen" size={14}/></button>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
+                            {relinkingNodeId && (
+                                <div className="p-4 bg-rose-50 border border-rose-100 rounded-xl animate-pulse">
+                                    <p className="text-xs font-bold text-rose-700 uppercase tracking-widest mb-1 flex items-center gap-2"><Icon name="RefreshCw" size={14} /> Relink Mode</p>
+                                    <p className="text-[11px] text-rose-600 leading-relaxed">Click a node to shift the link.</p>
+                                </div>
+                            )}
+
+                            {selectedNode ? (
+                                <div className="space-y-5 animate-in slide-in-from-left-2">
+                                    <div onBlur={() => pushToHistory(nodes, connections)}>
+                                        <label className="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Label</label>
+                                        <textarea className="w-full p-3 border rounded-lg text-sm font-semibold focus:ring-2 focus:ring-rose-200 resize-none h-20 shadow-inner" value={selectedNode.label} onChange={e => updateField('label', e.target.value)} />
+                                    </div>
+                                    
+                                    {selectedNode.type === 'TASK' && (
+                                        <div className="space-y-4">
+                                            <div>
+                                                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Checklist</label>
+                                                <div className="flex gap-2">
+                                                    <input type="text" className="flex-1 p-2 text-sm border rounded-lg focus:ring-2 focus:ring-rose-200 outline-none" value={newTaskInput} onChange={e => setNewTaskInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addTask()} placeholder="Task..." />
+                                                    <button onClick={addTask} className="p-2 bg-rose-500 text-white rounded-lg hover:bg-rose-600 shadow-md"><Icon name="Plus" size={16}/></button>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">
+                                                {(selectedNode.tasks || []).map(task => (
+                                                    <div key={task.id} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg group border border-slate-100 shadow-sm transition-all hover:bg-white">
+                                                        <input type="checkbox" checked={task.completed} onChange={() => toggleTask(task.id)} className="w-4 h-4 rounded text-rose-500 border-slate-300 focus:ring-rose-200 cursor-pointer" />
+                                                        <span className={`flex-1 text-sm ${task.completed ? 'line-through text-slate-400' : 'text-slate-700'}`}>{task.text}</span>
+                                                        <button onClick={() => removeTask(task.id)} className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Icon name="Trash2" size={14}/></button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {selectedNode.type === 'CONTACT' && (
+                                        <div onBlur={() => pushToHistory(nodes, connections)} className="space-y-4">
+                                            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Role / Affiliation</label><input type="text" className="w-full p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-rose-200 outline-none" value={selectedNode.contactRole || ''} onChange={e => updateField('contactRole', e.target.value)} placeholder="e.g. News Editor" /></div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Email</label><input type="email" className="w-full p-2.5 border rounded-lg text-sm" value={selectedNode.contactEmail || ''} onChange={e => updateField('contactEmail', e.target.value)} /></div>
+                                                <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Phone</label><input type="text" className="w-full p-2.5 border rounded-lg text-sm" value={selectedNode.contactPhone || ''} onChange={e => updateField('contactPhone', e.target.value)} /></div>
+                                            </div>
+                                            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Website / Social</label><input type="text" className="w-full p-2.5 border rounded-lg text-sm" value={selectedNode.contactWeb || ''} onChange={e => updateField('contactWeb', e.target.value)} /></div>
+                                            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Notes</label><textarea className="w-full h-20 p-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-rose-200 outline-none resize-none" value={selectedNode.description || ''} onChange={e => updateField('description', e.target.value)} /></div>
+                                        </div>
+                                    )}
+
+                                    {selectedNode.type === 'READING' && (
+                                        <div onBlur={() => pushToHistory(nodes, connections)} className="space-y-4">
+                                            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-2">Harvard Reference</label><textarea className="w-full h-28 p-3 border rounded-lg text-sm focus:ring-2 focus:ring-rose-200 outline-none resize-none shadow-inner" value={selectedNode.harvardRef || ''} onChange={e => updateField('harvardRef', e.target.value)} placeholder="Add a Harvard cite them right formatted reference here" /></div>
+                                            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Key takeaway/quote</label><textarea className="w-full h-24 p-3 bg-slate-50/50 border rounded-lg text-sm italic focus:ring-2 focus:ring-rose-200 outline-none resize-none" value={selectedNode.takeaway || ''} onChange={e => updateField('takeaway', e.target.value)} /></div>
+                                        </div>
+                                    )}
+
+                                    {selectedNode.type === 'SECTION' && (
+                                        <div onBlur={() => pushToHistory(nodes, connections)} className="space-y-4">
+                                            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-2">Overview</label><textarea className="w-full h-20 p-3 border rounded-lg text-sm" value={selectedNode.description || ''} onChange={e => updateField('description', e.target.value)} placeholder="Summary..." /></div>
+                                            <div className="pt-4 border-t border-slate-100"><label className="block text-xs font-bold text-rose-600 uppercase mb-2 flex items-center gap-2"><Icon name="Lightbulb" size={14}/> Lesson learned</label><p className="text-[10px] text-slate-500 mb-2">Summarise: "In future, when X, I will Y because Z."</p><textarea className={`w-full h-24 p-3 border rounded-lg text-sm focus:ring-2 focus:ring-rose-200 outline-none resize-none ${!selectedNode.lessonLearned ? 'bg-rose-50/50' : 'bg-white'}`} value={selectedNode.lessonLearned || ''} onChange={e => updateField('lessonLearned', e.target.value)} /></div>
+                                        </div>
+                                    )}
+
+                                    {selectedNode.type && !['SECTION', 'CONTACT', 'TASK', 'READING'].includes(selectedNode.type) && (
+                                        <div onBlur={() => pushToHistory(nodes, connections)} className="space-y-4">
+                                            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-2">Notes</label><textarea className="w-full h-32 p-3 border rounded-lg text-sm" value={selectedNode.description || ''} onChange={e => updateField('description', e.target.value)} /></div>
+                                            <div><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Link (URL)</label><input type="text" className="w-full p-2.5 border rounded-lg text-sm" value={selectedNode.link || ''} onChange={e => updateField('link', e.target.value)} placeholder="https://..." /></div>
+                                        </div>
+                                    )}
+
+                                    {selectedNode.isCenter && (
+                                        <div onBlur={() => pushToHistory(nodes, connections)}><label className="block text-xs font-bold text-slate-400 uppercase mb-2">Notes</label><textarea className="w-full h-48 border rounded-lg text-sm p-3 shadow-inner" value={selectedNode.description} onChange={e => updateField('description', e.target.value)} /></div>
+                                    )}
+                                    
+                                    <div className="pt-4 border-t grid grid-cols-1 gap-2">
+                                        {Object.entries(NODE_TYPES).map(([k, c]) => {
+                                            if (selectedNode.isCenter && k !== 'SECTION') return null;
+                                            if (!selectedNode.isCenter && k === 'SECTION') return null;
+                                            return (<button key={k} onClick={() => addNode(selectedId, k)} className="flex items-center gap-3 p-3 bg-white border rounded-xl hover:bg-slate-50 transition-all text-sm font-semibold active:scale-95 shadow-sm"><div className={`p-1.5 rounded-lg ${c.color.split(' ')[0]} border flex items-center justify-center shadow-sm`}><Icon name={c.icon} size={14} /></div> Add {c.label}</button>);
+                                        })}
+                                    </div>
+                                    {!selectedNode.isCenter && <button onClick={e => deleteNode(selectedId, e)} className="w-full p-3 text-red-500 text-xs font-bold uppercase tracking-wider bg-red-50 rounded-xl hover:bg-red-100 transition-all active:scale-95">Delete Node</button>}
+                                </div>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center text-slate-400 p-8 text-center gap-6 animate-in fade-in duration-500">
+                                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
+                                        <Icon name="MousePointer2" size={32}/>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-sm font-semibold text-slate-600">Select a node to start editing.</p>
+                                        <div className="bg-slate-50/80 rounded-2xl p-4 border border-slate-100 space-y-3">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Navigation Tips</p>
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                                                    <div className="w-6 h-6 rounded bg-white border shadow-sm flex items-center justify-center text-rose-500"><Icon name="Mouse" size={12}/></div>
+                                                    <span>Scroll wheel to zoom</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                                                    <div className="flex gap-0.5">
+                                                        <div className="w-6 h-6 rounded bg-white border shadow-sm flex items-center justify-center text-rose-500 font-bold">↑</div>
+                                                        <div className="w-6 h-6 rounded bg-white border shadow-sm flex items-center justify-center text-rose-500 font-bold">↓</div>
+                                                    </div>
+                                                    <span>Arrows to zoom</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-[11px] text-slate-500">
+                                                    <div className="w-6 h-6 rounded bg-white border shadow-sm flex items-center justify-center text-rose-500"><Icon name="Move" size={12}/></div>
+                                                    <span>Click & drag background to pan</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                        
+                        <div className="p-6 border-t bg-slate-50 space-y-2">
+                            <div className="relative group">
+                                <button onClick={exportToWord} disabled={isExportDisabled} className={`w-full p-3.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${isExportDisabled ? 'bg-slate-300 text-slate-500 cursor-not-allowed opacity-50' : 'bg-slate-900 text-white hover:bg-slate-800 shadow-lg active:scale-95'}`}><Icon name="FileText" size={18} /> Export Word Document</button>
+                                {isExportDisabled && <div className="absolute bottom-full left-0 w-full mb-3 p-2 bg-rose-900 text-white text-[10px] rounded-lg shadow-2xl pointer-events-none opacity-0 group-hover:opacity-100 transition-all">{sectionNodes.length === 0 ? "Add a Section node first." : "Complete all 'Lesson learned' boxes to export."}</div>}
+                            </div>
+                            <button onClick={() => setShowHelp(true)} className="w-full p-3 mt-2 bg-rose-50 text-rose-700 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:bg-rose-100 transition-all"><Icon name="HelpCircle" size={18} /> View Instructions</button>
+                        </div>
+                    </aside>
+
+                    <main className="flex-1 relative canvas-bg overflow-hidden" onMouseDown={handleMouseDownBg} onWheel={handleWheel} onTouchStart={handleMouseDownBg}>
+                        {!isSidebarOpen && <button onClick={() => setIsSidebarOpen(true)} className="absolute top-4 left-4 z-20 p-4 bg-white rounded-full shadow-lg border text-slate-600 active:scale-90 transition-transform" aria-label="Open sidebar"><Icon name="Menu" size={24} /></button>}
+                        
+                        {isListView ? (
+                            <div className="absolute inset-0 bg-white overflow-y-auto p-12 custom-scrollbar animate-in fade-in zoom-in-95">
+                                <div className="max-w-4xl mx-auto">
+                                    <h2 className="text-3xl font-black text-slate-900 mb-8 border-b pb-4">Outline View</h2>
+                                    <ul role="tree" aria-label="Mindmap outline">
+                                        {renderOutlineNode('center')}
+                                    </ul>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="absolute inset-0 origin-top-left" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})`, transition: draggingId || isPanning ? 'none' : 'transform 0.1s ease-out' }}>
+                                <svg className="absolute inset-0 w-full h-full pointer-events-none overflow-visible">
+                                    {connections.map((c, i) => {
+                                        const from = nodes.find(n => n.id === c.from), to = nodes.find(n => n.id === c.to);
+                                        if (!from || !to) return null;
+                                        const isStructuralLine = from.isCenter;
+                                        return (
+                                            <g key={i}>
+                                                <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} className={`line-hit-area ${!isStructuralLine ? 'line-hit-area-active' : ''}`} onMouseDown={(e) => { if (isStructuralLine) return; e.stopPropagation(); setRelinkingNodeId(to.id); setSelectedId(to.id); }} />
+                                                <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="#94a3b8" strokeWidth={isStructuralLine ? "2.5" : "1.5"} strokeDasharray={to.type !== 'SECTION' ? "4,4" : ""} className="connection-line transition-all duration-300" />
+                                            </g>
+                                        );
+                                    })}
+                                </svg>
+                                {nodes.map(n => {
+                                    const config = n.type ? NODE_TYPES[n.type] : null;
+                                    const isRelinking = relinkingNodeId === n.id;
+                                    const hasLesson = n.type === 'SECTION' && n.lessonLearned && n.lessonLearned.trim().length > 0;
+                                    const sectionIndex = n.type === 'SECTION' ? nodes.filter(node => node.type === 'SECTION' && node.x < n.x).length + 1 : null;
+                                    const parentNode = nodes.find(p => p.id === n.parentId);
+                                    
+                                    return (
+                                        <div 
+                                            key={n.id} 
+                                            onFocus={() => setSelectedId(n.id)} 
+                                            onMouseDown={e => handleStartNodeDrag(e, n.id)} 
+                                            onTouchStart={e => handleStartNodeDrag(e, n.id)}
+                                            role="button"
+                                            aria-label={`${n.type || 'Root Node'}: ${n.label}`}
+                                            aria-describedby={parentNode ? `Connected to ${parentNode.label}` : ''}
+                                            className={`absolute cursor-grab p-5 rounded-2xl shadow-sm border node-container min-w-[180px] max-w-[320px] flex items-center gap-4 transition-all ${n.color || 'bg-white text-slate-700'} ${selectedId === n.id ? 'ring-4 ring-rose-100 border-rose-400 scale-105 z-10 shadow-xl' : ''} ${config ? `border-2 ${config.color.split(' ').slice(1).join(' ')}` : ''} ${n.isCenter ? 'text-xl px-10 py-7 border-none font-bold shadow-2xl' : 'text-sm font-semibold'} ${isRelinking ? 'relinking-node' : ''} ${hasLesson ? '!border-emerald-500 ring-2 ring-emerald-100' : ''}`}
+                                            style={{ left: n.x, top: n.y, transform: 'translate(-50%, -50%)', transition: draggingId === n.id || isPanning ? 'none' : 'left 0.1s ease-out, top 0.1s ease-out' }}>
+                                            {n.type === 'SECTION' && <div className={`absolute -left-4 -top-4 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-white shadow-md transition-colors ${hasLesson ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>{sectionIndex}</div>}
+                                            {config && <Icon name={config.icon} size={18} className="opacity-70" />}
+                                            <span className="line-clamp-3 pointer-events-none">{n.label}</span>
+                                            {!n.isCenter && (
+                                                <div className="absolute -bottom-1 -right-1 z-20">
+                                                    <button onClick={e => { e.stopPropagation(); setPlusMenuId(plusMenuId === n.id ? null : n.id); }} className={`bg-white text-rose-500 rounded-full p-1.5 border shadow-md flex items-center justify-center transition-transform active:scale-90 ${plusMenuId === n.id ? 'rotate-45' : ''}`} aria-label="Quick Add"><Icon name="Plus" size={14} /></button>
+                                                    {plusMenuId === n.id && (
+                                                        <div className="absolute top-0 left-full ml-3 flex flex-col gap-1.5 bg-white p-2 rounded-xl shadow-2xl border z-50 w-52 animate-in fade-in" onMouseDown={e => e.stopPropagation()}>
+                                                            {Object.entries(NODE_TYPES).map(([k, cfg]) => k !== 'SECTION' && (<button key={k} onClick={e => { e.stopPropagation(); addNode(n.id, k); }} className="flex items-center gap-2.5 px-2 py-2 hover:bg-rose-50 rounded-lg text-xs font-bold text-slate-600 whitespace-nowrap"><div className={`p-1.5 rounded-md ${cfg.color.split(' ')[0]} border flex items-center justify-center`}><Icon name={cfg.icon} size={14} /></div> {cfg.label}</button>))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {!n.isCenter && <button onClick={e => deleteNode(n.id, e)} className="absolute -top-1 -right-6 bg-white text-slate-300 hover:text-red-500 rounded-full p-1.5 border shadow-md node-delete-btn flex items-center justify-center transition-colors active:scale-90" aria-label="Delete Node"><Icon name="X" size={12}/></button>}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 md:left-auto md:right-4 md:translate-x-0 z-20 pointer-events-none">
+                            <div className="px-2 py-1 bg-white/70 backdrop-blur-sm border border-slate-200 rounded-full shadow-sm text-[9px] font-medium text-slate-400 uppercase tracking-widest no-select text-center">
+                                Broccoli is based on an original idea by Dr Liz Hannaford
+                            </div>
+                        </div>
+
+                        {!isListView && (
+                            <div className="absolute bottom-14 right-4 flex flex-col gap-2 z-30">
+                                <button onClick={zoomIn} className="p-3 bg-white rounded-full shadow-lg border text-slate-600 active:scale-90 transition-transform hover:bg-slate-50" title="Zoom In (↑)">
+                                    <Icon name="Plus" size={20} />
+                                </button>
+                                <button onClick={zoomOut} className="p-3 bg-white rounded-full shadow-lg border text-slate-600 active:scale-90 transition-transform hover:bg-slate-50" title="Zoom Out (↓)">
+                                    <Icon name="Minus" size={20} />
+                                </button>
+                            </div>
+                        )}
+
+                        {showHelp && (
+                            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-6 z-[100]" onClick={() => setShowHelp(false)}>
+                                <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl p-10 animate-in zoom-in-95 duration-200 relative flex flex-col" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh' }}>
+                                    <button onClick={() => setShowHelp(false)} className="absolute top-6 right-6 bg-red-50 p-4 rounded-full text-red-500 hover:bg-red-100 shadow-sm flex items-center justify-center z-10" aria-label="Close guide"><Icon name="X" size={24} /></button>
+                                    
+                                    <div className="overflow-y-auto pr-2 custom-scrollbar flex-1">
+                                        <div className="mb-8">
+                                            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Broccoli Guide</h2>
+                                            <p className="text-slate-500 font-medium">Breaking down big projects into tasty chunks</p>
+                                            <p className="mt-2 text-slate-500 text-xs leading-relaxed">
+                                                Broccoli helps you break down projects into tasty chunks to make the whole thing more digestable. Start by adding a <strong>Section Heading (H)</strong> node to outline the main elements project. Then, add different nodes like <strong>Sources</strong>, <strong>Reading and research</strong>, <strong>Contacts</strong>, and <strong>Tasks</strong> to each section to break things down into useable content. When you're done, you can export your plan to a structured word document to form the backbone of any documentation or reflection.
+                                            </p>
+                                            <p className="mt-2 text-slate-500 text-xs leading-relaxed">
+                                                <strong>Your work is automatically saved to your browser's memory.</strong> You can also manually download a project file for backup by clicking the "Save Map" button in the toolbar.
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-6 text-slate-700 text-sm leading-relaxed">
+                                            <section className="p-5 bg-blue-50 border border-blue-100 rounded-2xl text-xs">
+                                                <h3 className="font-bold text-blue-900 mb-2 flex items-center gap-2"><Icon name="Info" size={16} /> Relinking Nodes</h3>
+                                                <p className="text-blue-800">To move a point to another section, <strong>click the line connecting it</strong>, then click its new parent node.</p>
+                                            </section>
+                                            <section className="p-5 bg-slate-50 border border-slate-200 rounded-2xl text-xs">
+                                                <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-2"><Icon name="Lock" size={16} /> Word Export</h3>
+                                                <p className="text-slate-700">Export is locked until every <strong>Section Heading</strong> has a "Lesson learned". Badges turn <span className="text-emerald-600 font-bold">Green</span> when ready.</p>
+                                            </section>
+                                            <div className="grid grid-cols-2 gap-2 text-[11px] pb-4">
+                                                <div className="flex items-center gap-2"><kbd className="px-1.5 py-0.5 bg-slate-100 border rounded font-bold">H</kbd> Add Heading</div>
+                                                <div className="flex items-center gap-2"><kbd className="px-1.5 py-0.5 bg-slate-100 border rounded font-bold">S</kbd> Add Source</div>
+                                                <div className="flex items-center gap-2"><kbd className="px-1.5 py-0.5 bg-slate-100 border rounded font-bold">R</kbd> Add Reading</div>
+                                                <div className="flex items-center gap-2"><kbd className="px-1.5 py-0.5 bg-slate-100 border rounded font-bold">C</kbd> Add Contact</div>
+                                                <div className="flex items-center gap-2"><kbd className="px-1.5 py-0.5 bg-slate-100 border rounded font-bold">D</kbd> Add Task</div>
+                                                <div className="flex items-center gap-2"><kbd className="px-1.5 py-0.5 bg-slate-100 border rounded font-bold">E</kbd> Add Industry</div>
+                                                <div className="flex items-center gap-2"><kbd className="px-1.5 py-0.5 bg-slate-100 border rounded font-bold">T</kbd> Add Text</div>
+                                                <div className="flex items-center gap-2"><kbd className="px-1.5 py-0.5 bg-slate-100 border rounded font-bold">Z</kbd> Reset View</div>
+                                                <div className="flex items-center gap-2"><kbd className="px-1.5 py-0.5 bg-slate-100 border rounded font-bold">↑ / ↓</kbd> Zoom In / Out</div>
+                                                <div className="flex items-center gap-2"><kbd className="px-1.5 py-0.5 bg-slate-100 border rounded font-bold">Drag</kbd> Pan Canvas</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <button onClick={() => setShowHelp(false)} className="w-full mt-4 py-5 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all text-lg shadow-xl active:scale-95 shrink-0">Start Mapping</button>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
