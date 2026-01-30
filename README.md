@@ -14,3 +14,5 @@ You can see a working demo at https://journalism.cards/broccoli/ with a demo but
 
 ## Credits
 Based on an idea by Dr Liz Hannaford, the principle is simple - when you're trying to be healthy, a whole stem of broccoli can put you off. Too much effort! Cut it into chunks and suddenly those healthy habits look easier.
+
+Broccoli was coded, in part, using AI. 
