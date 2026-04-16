@@ -55,6 +55,19 @@
 
         const STORAGE_KEY = 'broccoli_autosave_data';
         const toKebab = (str) => str.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+        const escHtml = (s) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+        const Icon = ({ name, size = 16, className = "" }) => {
+            const iconRef = useRef(null);
+            useEffect(() => {
+                if (iconRef.current && window.lucide) {
+                    const kebabName = toKebab(name);
+                    iconRef.current.innerHTML = `<i data-lucide="${kebabName}"></i>`;
+                    window.lucide.createIcons({ attrs: { width: size, height: size, class: className }, nameAttr: 'data-lucide' });
+                }
+            }, [name, size, className]);
+            return <span ref={iconRef} className="inline-flex items-center justify-center leading-none pointer-events-none"></span>;
+        };
 
         const DEFAULT_STATE = {
             nodes: [
@@ -84,17 +97,18 @@
                 return DEFAULT_STATE;
             };
 
-            const initialData = getInitialData();
-            const [nodes, setNodes] = useState(initialData.nodes);
-            const [connections, setConnections] = useState(initialData.connections);
-            const [view, setView] = useState(initialData.view);
+            const [nodes, setNodes] = useState(() => getInitialData().nodes);
+            const [connections, setConnections] = useState(() => getInitialData().connections);
+            const [view, setView] = useState(() => getInitialData().view);
             const [isListView, setIsListView] = useState(false);
 
-            const [history, setHistory] = useState([{ 
-                nodes: JSON.parse(JSON.stringify(initialData.nodes)), 
-                connections: JSON.parse(JSON.stringify(initialData.connections)) 
-            }]);
+            const [history, setHistory] = useState(() => {
+                const d = getInitialData();
+                return [{ nodes: JSON.parse(JSON.stringify(d.nodes)), connections: JSON.parse(JSON.stringify(d.connections)) }];
+            });
             const [historyIndex, setHistoryIndex] = useState(0);
+            const historyIndexRef = useRef(0);
+            useEffect(() => { historyIndexRef.current = historyIndex; }, [historyIndex]);
 
             const [isPanning, setIsPanning] = useState(false);
             const [lastMousePos, setLastMousePos] = useState({ x: 0, y: 0 });
@@ -118,29 +132,17 @@
             const missingLessons = useMemo(() => sectionNodes.filter(n => !n.lessonLearned || n.lessonLearned.trim() === ""), [sectionNodes]);
             const isExportDisabled = sectionNodes.length === 0 || missingLessons.length > 0;
 
-            const Icon = ({ name, size = 16, className = "" }) => {
-                const iconRef = useRef(null);
-                useEffect(() => {
-                    if (iconRef.current && window.lucide) {
-                        const kebabName = toKebab(name);
-                        iconRef.current.innerHTML = `<i data-lucide="${kebabName}"></i>`;
-                        window.lucide.createIcons({ attrs: { width: size, height: size, class: className }, nameAttr: 'data-lucide' });
-                    }
-                }, [name, size, className]);
-                return <span ref={iconRef} className="inline-flex items-center justify-center leading-none pointer-events-none"></span>;
-            };
-
             const pushToHistory = useCallback((currentNodes, currentConnections) => {
                 const snapshotNodes = JSON.parse(JSON.stringify(currentNodes));
                 const snapshotConnections = JSON.parse(JSON.stringify(currentConnections));
                 setHistory(prev => {
-                    const newHistory = prev.slice(0, historyIndex + 1);
+                    const newHistory = prev.slice(0, historyIndexRef.current + 1);
                     if (newHistory.length >= 20) newHistory.shift();
                     const result = [...newHistory, { nodes: snapshotNodes, connections: snapshotConnections }];
                     setHistoryIndex(result.length - 1);
                     return result;
                 });
-            }, [historyIndex]);
+            }, []);
 
             const undo = useCallback(() => {
                 if (historyIndex > 0) {
@@ -161,7 +163,7 @@
             }, [history, historyIndex]);
 
             const resetView = useCallback(() => setView({ x: 0, y: 0, zoom: 1 }), []);
-            const updateField = (f, v) => setNodes(nodes.map(n => n.id === selectedId ? { ...n, [f]: v } : n));
+            const updateField = (f, v) => setNodes(prev => prev.map(n => n.id === selectedId ? { ...n, [f]: v } : n));
 
             const handleNewMap = () => {
                 if (confirm("Are you sure you want to start a new map? This will clear all current work.")) {
@@ -236,9 +238,8 @@
             };
 
             const handleWheel = (e) => {
-                const zoomSpeed = 0.001;
-                const newZoom = Math.min(Math.max(view.zoom + (-e.deltaY) * zoomSpeed, 0.2), 3);
-                setView(prev => ({ ...prev, zoom: newZoom }));
+                const delta = -e.deltaY * 0.001;
+                setView(prev => ({ ...prev, zoom: Math.min(Math.max(prev.zoom + delta, 0.2), 3) }));
             };
 
             const handleMouseDownBg = (e) => {
@@ -353,34 +354,35 @@
                 let content = `<html><head><meta charset="utf-8"><title>Mindmap output</title><style>body { font-family: 'Aptos', 'Segoe UI', sans-serif; padding: 40pt; } .title { font-size: 28pt; font-weight: bold; border-bottom: 1pt solid #DDD; } h1 { color: #2B579A; font-size: 20pt; margin-top: 30pt; } h2 { color: #2B579A; font-size: 16pt; margin-top: 20pt; } p { font-size: 12pt; margin-bottom: 10pt; } .label { font-weight: bold; color: #666; font-size: 10pt; text-transform: uppercase; } .lesson-box { background: #FFF1F2; padding: 10pt; border-left: 4pt solid #E11D48; margin-bottom: 15pt; } .contact-card { background: #F0FDF4; border: 1pt solid #10B981; padding: 10pt; border-radius: 8pt; margin: 10pt 0; }</style></head><body><div class="title">Mindmap output (via Broccoli)</div>`;
                 const renderHierarchy = (pid, level = 0) => {
                     return nodes.filter(n => n.parentId === pid).map(child => {
-                        let html = `<div style="margin-left: 15pt"><h${level+2}>${child.label}</h${level+2}>`;
+                        const hLevel = Math.min(level + 2, 6);
+                        let html = `<div style="margin-left: 15pt"><h${hLevel}>${escHtml(child.label)}</h${hLevel}>`;
                         if (child.type === 'CONTACT') {
-                            html += `<div class="contact-card"><p><strong>Name:</strong> ${child.label}</p>${child.contactRole ? `<p><strong>Role:</strong> ${child.contactRole}</p>` : ''}${child.contactEmail ? `<p><strong>Email:</strong> ${child.contactEmail}</p>` : ''}${child.contactPhone ? `<p><strong>Phone:</strong> ${child.contactPhone}</p>` : ''}${child.contactWeb ? `<p><strong>Web:</strong> ${child.contactWeb}</p>` : ''}${child.description ? `<p><strong>Notes:</strong><br>${child.description}</p>` : ''}</div>`;
+                            html += `<div class="contact-card"><p><strong>Name:</strong> ${escHtml(child.label)}</p>${child.contactRole ? `<p><strong>Role:</strong> ${escHtml(child.contactRole)}</p>` : ''}${child.contactEmail ? `<p><strong>Email:</strong> ${escHtml(child.contactEmail)}</p>` : ''}${child.contactPhone ? `<p><strong>Phone:</strong> ${escHtml(child.contactPhone)}</p>` : ''}${child.contactWeb ? `<p><strong>Web:</strong> ${escHtml(child.contactWeb)}</p>` : ''}${child.description ? `<p><strong>Notes:</strong><br>${escHtml(child.description)}</p>` : ''}</div>`;
                         } else if (child.type === 'TASK') {
-                            html += `<ul style="list-style: none; padding: 0;">${(child.tasks || []).map(t => `<li style="margin-bottom: 4pt;">${t.completed ? '☑' : '☐'} ${t.text}</li>`).join('')}</ul>`;
+                            html += `<ul style="list-style: none; padding: 0;">${(child.tasks || []).map(t => `<li style="margin-bottom: 4pt;">${t.completed ? '☑' : '☐'} ${escHtml(t.text)}</li>`).join('')}</ul>`;
                         } else if (child.type === 'READING') {
-                            html += `${child.harvardRef ? `<p><span class="label">HARVARD REFERENCE:</span><br>${child.harvardRef}</p>` : ''}${child.link ? `<p><span class="label">LINK:</span> ${child.link}</p>` : ''}${child.takeaway ? `<p><span class="label">TAKEAWAY:</span><br><i>"${child.takeaway}"</i></p>` : ''}`;
+                            html += `${child.harvardRef ? `<p><span class="label">HARVARD REFERENCE:</span><br>${escHtml(child.harvardRef)}</p>` : ''}${child.link ? `<p><span class="label">LINK:</span> ${escHtml(child.link)}</p>` : ''}${child.takeaway ? `<p><span class="label">TAKEAWAY:</span><br><i>&ldquo;${escHtml(child.takeaway)}&rdquo;</i></p>` : ''}`;
                         } else {
-                            html += `${child.description ? `<p><span class="label">DESCRIPTION:</span><br>${child.description}</p>` : ''}${child.link ? `<p><span class="label">LINK:</span> ${child.link}</p>` : ''}${child.takeaway ? `<p><span class="label">TAKEAWAY:</span><br><i>"${child.takeaway}"</i></p>` : ''}`;
+                            html += `${child.description ? `<p><span class="label">DESCRIPTION:</span><br>${escHtml(child.description)}</p>` : ''}${child.link ? `<p><span class="label">LINK:</span> ${escHtml(child.link)}</p>` : ''}${child.takeaway ? `<p><span class="label">TAKEAWAY:</span><br><i>&ldquo;${escHtml(child.takeaway)}&rdquo;</i></p>` : ''}`;
                         }
                         return html + `</div>` + renderHierarchy(child.id, level + 1);
                     }).join('');
                 };
-                sortedSections.forEach((sec, idx) => { 
-                    content += `<h1>${idx + 1}. ${sec.label}</h1>${sec.description ? `<p>${sec.description}</p>` : ''}<div class="lesson-box"><p><span class="label">LESSON LEARNED:</span><br><strong>${sec.lessonLearned}</strong></p></div>`;
-                    content += renderHierarchy(sec.id); 
+                sortedSections.forEach((sec, idx) => {
+                    content += `<h1>${idx + 1}. ${escHtml(sec.label)}</h1>${sec.description ? `<p>${escHtml(sec.description)}</p>` : ''}<div class="lesson-box"><p><span class="label">LESSON LEARNED:</span><br><strong>${escHtml(sec.lessonLearned)}</strong></p></div>`;
+                    content += renderHierarchy(sec.id);
                 });
                 const allContacts = nodes.filter(n => n.type === 'CONTACT').sort((a, b) => a.label.localeCompare(b.label));
                 if (allContacts.length > 0) {
                     content += `<br clear="all" style="page-break-before:always"><h1>Contacts Directory</h1>`;
                     allContacts.forEach(child => {
-                        content += `<div class="contact-card"><p><strong>Name:</strong> ${child.label}</p>${child.contactRole ? `<p><strong>Role:</strong> ${child.contactRole}</p>` : ''}${child.contactEmail ? `<p><strong>Email:</strong> ${child.contactEmail}</p>` : ''}${child.contactPhone ? `<p><strong>Phone:</strong> ${child.contactPhone}</p>` : ''}${child.contactWeb ? `<p><strong>Web:</strong> ${child.contactWeb}</p>` : ''}${child.description ? `<p><strong>Notes:</strong><br>${child.description}</p>` : ''}</div>`;
+                        content += `<div class="contact-card"><p><strong>Name:</strong> ${escHtml(child.label)}</p>${child.contactRole ? `<p><strong>Role:</strong> ${escHtml(child.contactRole)}</p>` : ''}${child.contactEmail ? `<p><strong>Email:</strong> ${escHtml(child.contactEmail)}</p>` : ''}${child.contactPhone ? `<p><strong>Phone:</strong> ${escHtml(child.contactPhone)}</p>` : ''}${child.contactWeb ? `<p><strong>Web:</strong> ${escHtml(child.contactWeb)}</p>` : ''}${child.description ? `<p><strong>Notes:</strong><br>${escHtml(child.description)}</p>` : ''}</div>`;
                     });
                 }
                 const allRefs = nodes.filter(n => n.type === 'READING' && n.harvardRef && n.harvardRef.trim()).map(n => n.harvardRef.trim()).sort((a, b) => a.localeCompare(b));
                 if (allRefs.length > 0) {
                     content += `<br clear="all" style="page-break-before:always"><h1>Reference List</h1>`;
-                    allRefs.forEach(ref => { content += `<p style="margin-bottom: 8pt;">${ref}</p>`; });
+                    allRefs.forEach(ref => { content += `<p style="margin-bottom: 8pt;">${escHtml(ref)}</p>`; });
                 }
                 content += `</body></html>`;
                 const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
@@ -599,8 +601,7 @@
                                     const isRelinking = relinkingNodeId === n.id;
                                     const hasLesson = n.type === 'SECTION' && n.lessonLearned && n.lessonLearned.trim().length > 0;
                                     const sectionIndex = n.type === 'SECTION' ? nodes.filter(node => node.type === 'SECTION' && node.x < n.x).length + 1 : null;
-                                    const parentNode = nodes.find(p => p.id === n.parentId);
-                                    
+
                                     return (
                                         <div 
                                             key={n.id} 
@@ -609,7 +610,6 @@
                                             onTouchStart={e => handleStartNodeDrag(e, n.id)}
                                             role="button"
                                             aria-label={`${n.type || 'Root Node'}: ${n.label}`}
-                                            aria-describedby={parentNode ? `Connected to ${parentNode.label}` : ''}
                                             className={`absolute cursor-grab p-5 rounded-2xl shadow-sm border node-container min-w-[180px] max-w-[320px] flex items-center gap-4 transition-all ${n.color || 'bg-white text-slate-700'} ${selectedId === n.id ? 'ring-4 ring-rose-100 border-rose-400 scale-105 z-10 shadow-xl' : ''} ${config ? `border-2 ${config.color.split(' ').slice(1).join(' ')}` : ''} ${n.isCenter ? 'text-xl px-10 py-7 border-none font-bold shadow-2xl' : 'text-sm font-semibold'} ${isRelinking ? 'relinking-node' : ''} ${hasLesson ? '!border-emerald-500 ring-2 ring-emerald-100' : ''}`}
                                             style={{ left: n.x, top: n.y, transform: 'translate(-50%, -50%)', transition: draggingId === n.id || isPanning ? 'none' : 'left 0.1s ease-out, top 0.1s ease-out' }}>
                                             {n.type === 'SECTION' && <div className={`absolute -left-4 -top-4 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border-2 border-white shadow-md transition-colors ${hasLesson ? 'bg-emerald-500 text-white' : 'bg-red-500 text-white'}`}>{sectionIndex}</div>}
